@@ -1,0 +1,28 @@
+name: Jarvis Sabah Brifingi
+
+on:
+  schedule:
+    # Türkiye saatiyle (UTC+3) her sabah tam 08:00'de çalışır (UTC 05:00)
+    - cron: '0 5 * * *'
+  workflow_dispatch: # İstediğiniz an elle test etmek için buton açar
+
+jobs:
+  brifing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodları Al
+        uses: actions/checkout@v4
+
+      - name: Python Kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Kütüphaneleri Yükle
+        run: pip install requests
+
+      - name: Jarvis'i Calistir
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python jarvis.py
