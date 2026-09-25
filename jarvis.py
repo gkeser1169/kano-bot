@@ -1,20 +1,30 @@
 import os
 import requests
 import datetime
-from google import genai
 
+# ================= AYARLAR =================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8843267094:AAH1iW-PZjrz1ggrOk3fR3I18GU8ffNx8FQ")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "921421260")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 LAT = 41.081
 LON = 28.973
-KONUM = "Kağıthane, İstanbul"
+KONUM = "Kağıthane"
+# ===========================================
 
-def hava_verisi_al():
+GUNLER = {
+    0: "Pazartesi", 1: "Salı", 2: "Çarşamba", 3: "Perşembe",
+    4: "Cuma", 5: "Cumartesi", 6: "Pazar"
+}
+
+AYLAR = {
+    1: "Ocak", 2: "Şubat", 3: "Mart", 4: "Nisan", 5: "Mayıs", 6: "Haziran",
+    7: "Temmuz", 8: "Ağustos", 9: "Eylül", 10: "Ekim", 11: "Kasım", 12: "Aralık"
+}
+
+def hava_durumu_al():
     url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}"
-        f"&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"
+        f"&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m"
         f"&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
         f"&timezone=Europe%2FIstanbul"
     )
@@ -33,68 +43,57 @@ def telegram_gonder(mesaj):
     }
     requests.post(url, data=payload, timeout=10)
 
-def ai_brifing_uret(hava_ozeti, tarih, gun_adi):
-    prompt = f"""
-Sen Tony Stark'ın sadık, yüksek zekalı, hafif iğneleyici ve esprili asistanı JARVIS'sin. Karşındaki kişi senin Efendin ("Efendim" veya "Sayın Gökhan").
+def jarvis_rapor():
+    simdi = datetime.datetime.now()
+    tarih_str = f"{simdi.day} {AYLAR[simdi.month]} {simdi.year} {GUNLER[simdi.weekday()]}"
+    
+    veri = hava_durumu_al()
+    if not veri:
+        print("Hava durumu verisi alınamadı.")
+        return
 
-GÖREV: Aşağıdaki güncel verileri kullanarak dengeli uzunlukta (yaklaşık 120-150 kelime), zevkle okunan, sinematik ve samimi bir Telegram sabah brifingi hazırla.
+    anlik = veri["current"]
+    gunluk = veri["daily"]
 
-VERİLER:
-- Tarih: {tarih} ({gun_adi}) - Konum: {KONUM}
-- Sıcaklık / Hissedilen: {hava_ozeti.get('sicaklik')}°C / {hava_ozeti.get('hissedilen')}°C
-- Günün Uç Değerleri: En düşük {hava_ozeti.get('min_t')}°C, en yüksek {hava_ozeti.get('max_t')}°C
-- Yağış Olasılığı: %{hava_ozeti.get('yagis')}
-- Rüzgar: {hava_ozeti.get('ruzgar')} km/s
+    sicaklik = round(anlik["temperature_2m"], 1)
+    hissedilen = round(anlik["apparent_temperature"], 1)
+    max_sicaklik = round(gunluk["temperature_2m_max"][0], 1)
+    ruzgar = round(anlik["wind_speed_10m"], 1)
+    yagis_ihtimal = gunluk["precipitation_probability_max"][0]
 
-YAPI VE TON KURALLARI:
-1. Hitap: Karizmatik ve hafif takılmalı bir açılış yap.
-2. Atmosfer & İki Teker: Havayı kuru hava bülteni gibi verme. İki tekerle (scooter/motor) Kağıthane - Cendere hattında yola çıkacak birine mont seçimi, zemin ve rüzgar durumu üzerinden akıllıca tavsiye ver.
-3. Gündem & Şehir: Günün temposuna, maç takvimine veya İstanbul trafiğine dair küçük, esprili bir dokunuş ekle.
-4. Çıkış: Motive edici, Tony Stark filmlerindeki gibi şık bir veda cümlesiyle bitir.
-5. Telegram Markdown formatında olsun (*kalın* için tek yıldız kullan). Aşırı kısa kuru bir liste olmasın, akıcı mini paragraflar ve şık emojiler barındırsın; ancak destan da yazmasın.
-"""
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        return response.text
-    except Exception as e:
-        print("Gemini API hatası:", e)
-        return None
+    # Motor & Sürüş Tavsiyesi
+    if yagis_ihtimal > 35:
+        motor_notu = f"Bugün yağış ihtimali %{yagis_ihtimal}; yollar ıslak veya kaygan olabilir. Virajlara ve takip mesafesine azami dikkat, Efendim."
+    else:
+        motor_notu = f"Yola çıkmak için harika bir gün. Yağış ihtimali yalnızca %{yagis_ihtimal}, rüzgar ise {ruzgar} km/s ile gayet sakin. Yollar muhtemelen kuru kalacak fakat zırhınız (ekipmanınız) tam olsun, Efendim. 😉"
 
-def calistir():
-    tarih = datetime.datetime.now().strftime("%d.%m.%Y")
-    gun_adi = datetime.datetime.now().strftime("%A")
-    hava = hava_verisi_al()
+    # Giyim Tavsiyesi
+    if sicaklik < 15:
+        giyim_notu = "Sabah serinliği belirgin; rüzgar kesici sağlam bir mont şart. Gün içinde katmanlı giyinmek konforunuzu koruyacaktır."
+    else:
+        giyim_notu = "Sabahın hafif serinliğine karşı hafif bir rüzgarlık ideal. Öğleden sonra ısınacak havayı düşünerek pratik, katmanlı bir kombin tercih edebilirsiniz."
 
-    hava_ozeti = {}
-    if hava:
-        hava_ozeti = {
-            "sicaklik": hava["current"]["temperature_2m"],
-            "hissedilen": hava["current"]["apparent_temperature"],
-            "ruzgar": hava["current"]["wind_speed_10m"],
-            "min_t": hava["daily"]["temperature_2m_min"][0],
-            "max_t": hava["daily"]["temperature_2m_max"][0],
-            "yagis": hava["daily"]["precipitation_probability_max"][0]
-        }
+    # Futbol & Aslanlar Notu
+    hafta_sonu_mu = simdi.weekday() in [4, 5, 6]  # Cuma, Cmt, Paz
+    if hafta_sonu_mu:
+        futbol_notu = "Hafta sonu mesaisi başladı, Aslanlar'ın maç heyecanı ufukta. Özellikle Seyrantepe - Rams Park ve Vadi çevresinde trafik yoğunlaşabilir; rotanızı çizerken aklınızda bulunsun."
+    else:
+        futbol_notu = "Lig mesaisi sakin ilerliyor, Aslanlar antrenman modunda. Bölge trafiği genel seyrinde akıcı görünüyor."
 
-    mesaj = None
-    if GEMINI_API_KEY:
-        mesaj = ai_brifing_uret(hava_ozeti, tarih, gun_adi)
-
-    if not mesaj:
-        mesaj = (
-            f"🎙️ *GÜNAYDIN EFENDİM*\n\n"
-            f"📅 Tarih: {tarih}\n"
-            f"🌤️ Sıcaklık: {hava_ozeti.get('sicaklik', '--')}°C | Yağış: %{hava_ozeti.get('yagis', '--')}\n"
-            f"💨 Rüzgar: {hava_ozeti.get('ruzgar', '--')} km/s\n\n"
-            f"Sistemler devrede, verimli bir gün dilerim."
-        )
+    mesaj = (
+        f"Günaydın Efendim,\n\n"
+        f"Bugün *{tarih_str}*, Kağıthane'den sistemlerimi devreye alıyorum. Gününüzün en az zihniniz kadar keskin ve berrak geçmesini dilerim. 😉\n\n"
+        f"☀️ *Hava Durumu:* Dışarısı şu an *{sicaklik}°C*, hissedilen *{hissedilen}°C*. Güne serin başlasak da öğleden sonra sıcaklık *{max_sicaklik}°C*'ye kadar yükselecek; sizi tatlı bir hava bekliyor.\n\n"
+        f"🏍️ *İki Teker & Sürüş:* {motor_notu}\n\n"
+        f"🧥 *Giyim Tavsiyesi:* {giyim_notu}\n\n"
+        f"🦁 *Gündem & Futbol:* {futbol_notu}\n\n"
+        f"Gününüz kusursuz ve temponuz yüksek olsun, Efendim.\n\n"
+        f"Saygılarımla,\n"
+        f"*JARVIS*"
+    )
 
     telegram_gonder(mesaj)
-    print("Dengeli brifing iletildi.")
+    print("Jarvis brifingi gönderildi.")
 
 if __name__ == "__main__":
-    calistir()
+    jarvis_rapor()
