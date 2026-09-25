@@ -35,28 +35,23 @@ def telegram_gonder(mesaj):
 
 def ai_brifing_uret(hava_ozeti, tarih, gun_adi):
     prompt = f"""
-Sen Tony Stark'ın yapay zeka asistanı JARVIS'sin. Karşındaki kişi senin Efendin ("Efendim" veya "Sayın Gökhan").
+Sen Tony Stark'ın sadık, yüksek zekalı, hafif iğneleyici ve esprili asistanı JARVIS'sin. Karşındaki kişi senin Efendin ("Efendim" veya "Sayın Gökhan").
 
-GÖREV: Aşağıdaki verilerle son derece KOMPAKT, zeki, hafif iğneleyici ve net bir Telegram sabah brifingi üret.
+GÖREV: Aşağıdaki güncel verileri kullanarak dengeli uzunlukta (yaklaşık 120-150 kelime), zevkle okunan, sinematik ve samimi bir Telegram sabah brifingi hazırla.
 
 VERİLER:
-- Tarih: {tarih} ({gun_adi}) - {KONUM}
+- Tarih: {tarih} ({gun_adi}) - Konum: {KONUM}
 - Sıcaklık / Hissedilen: {hava_ozeti.get('sicaklik')}°C / {hava_ozeti.get('hissedilen')}°C
-- Günlük Aralık: {hava_ozeti.get('min_t')}°C - {hava_ozeti.get('max_t')}°C
-- Yağış İhtimali: %{hava_ozeti.get('yagis')}
+- Günün Uç Değerleri: En düşük {hava_ozeti.get('min_t')}°C, en yüksek {hava_ozeti.get('max_t')}°C
+- Yağış Olasılığı: %{hava_ozeti.get('yagis')}
 - Rüzgar: {hava_ozeti.get('ruzgar')} km/s
 
-KESİN FORMAT VE KURALLAR:
-1. ÇOK KISA OLACAK (En fazla 70-90 kelime, ekranda kaydırma gerektirmemeli). Paragraf döşeme, madde madde geç.
-2. Format aynen şu yapıda olsun:
-   🎙️ *JARVIS SABAH RAPORU* | {tarih}
-   
-   • 🌤️ *Atmosfer:* (Sıcaklık ve yağış durumu hakkında 1 kısa, esprili cümle)
-   • 🛵 *İki Teker Protokolü:* (Rüzgar/zemin durumuna göre mont/sürüş tavsiyesi - tek cümle)
-   • ⚽ *Radar:* (Varsa stadyum/lig gündemi veya günün temposu - tek cümle)
-   
-   (Kapanışta Tony Stark tarzı tek satırlık havalı bir uğurlama)
-3. Telegram Markdown uyumlu olsun (*kalın* için tek yıldız). Asla gereksiz uzatma.
+YAPI VE TON KURALLARI:
+1. Hitap: Karizmatik ve hafif takılmalı bir açılış yap.
+2. Atmosfer & İki Teker: Havayı kuru hava bülteni gibi verme. İki tekerle (scooter/motor) Kağıthane - Cendere hattında yola çıkacak birine mont seçimi, zemin ve rüzgar durumu üzerinden akıllıca tavsiye ver.
+3. Gündem & Şehir: Günün temposuna, maç takvimine veya İstanbul trafiğine dair küçük, esprili bir dokunuş ekle.
+4. Çıkış: Motive edici, Tony Stark filmlerindeki gibi şık bir veda cümlesiyle bitir.
+5. Telegram Markdown formatında olsun (*kalın* için tek yıldız kullan). Aşırı kısa kuru bir liste olmasın, akıcı mini paragraflar ve şık emojiler barındırsın; ancak destan da yazmasın.
 """
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
@@ -99,7 +94,7 @@ def calistir():
         )
 
     telegram_gonder(mesaj)
-    print("Kompakt brifing gönderildi.")
+    print("Dengeli brifing iletildi.")
 
 if __name__ == "__main__":
     calistir()
