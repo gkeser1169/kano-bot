@@ -1,35 +1,22 @@
 import os
 import requests
 import datetime
+from google import genai
 
 # ================= AYARLAR =================
-# GitHub Secrets'tan alır; yerelde test için tırnak içine yazabilirsiniz
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8295147260:AAHvLFKd8aYg783qQiM2raUpk5Kmhns9OH0")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8843267094:AAH1iW-PZjrz1ggrOk3fR3I18GU8ffNx8FQ")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "921421260")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Kağıthane Koordinatları
 LAT = 41.081
 LON = 28.973
-KONUM = "Kağıthane"
+KONUM = "Kağıthane, İstanbul"
 # ===========================================
-
-HAVA_DURUMLARI = {
-    0: "Açık / Güneşli ☀️",
-    1: "Az Bulutlu 🌤️",
-    2: "Parçalı Bulutlu ⛅",
-    3: "Bulutlu ☁️",
-    45: "Sisli 🌫️",
-    51: "Hafif Çiseleme 🌦️",
-    61: "Yağmurlu 🌧️",
-    63: "Kuvvetli Yağmur 🌧️",
-    80: "Sağanak Yağış 🌦️",
-    95: "Fırtına ⚡"
-}
 
 def hava_verisi_al():
     url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}"
-        f"&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m"
+        f"&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"
         f"&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
         f"&timezone=Europe%2FIstanbul"
     )
@@ -38,43 +25,6 @@ def hava_verisi_al():
         return r.json() if r.status_code == 200 else None
     except:
         return None
-
-def surus_ve_trafik_analizi(hava):
-    if not hava:
-        return "Yol verisi okunamadı."
-    
-    anlik = hava["current"]
-    ruzgar = anlik["wind_speed_10m"]
-    yagis_ihtimali = hava["daily"]["precipitation_probability_max"][0]
-    sicaklik = anlik["temperature_2m"]
-
-    notlar = []
-    
-    # İki teker & sürüş güvenliği tavsiyeleri
-    if yagis_ihtimali > 40:
-        notlar.append("⚠️ Zemin ıslak/kaygan olabilir, fren mesafesine ve virajlara dikkat.")
-    else:
-        notlar.append("✅ Zemin kuru, sürüş için uygun.")
-
-    if ruzgar > 35:
-        notlar.append(f"💨 Şiddetli rüzgar ({ruzgar} km/s), açık köprü ve viyadük geçişlerinde dikkat.")
-    elif ruzgar > 20:
-        notlar.append(f"🍃 Orta kuvvette rüzgar ({ruzgar} km/s).")
-
-    if sicaklik < 12:
-        notlar.append("🧥 Hava soğuk, rüzgarlık/koruyucu mont şart.")
-    elif sicaklik < 18:
-        notlar.append("🌤️ Sabah serin, öğleden sonra ılık. Hafif rüzgarlık yeterli.")
-
-    return "\n".join(notlar)
-
-def mac_durumu_getir():
-    # Günün önemli maç takvimine hızlı kontrol
-    bugun = datetime.datetime.now().strftime("%A")
-    hafta_sonu = bugun in ["Saturday", "Sunday"]
-    if hafta_sonu:
-        return "⚽ Süper Lig mesaisi aktif. Maç saatine doğru Seyrantepe ve Vadi aksında trafik yoğunluğu oluşabilir."
-    return "⚽ Hafta içi fikstürü sakin. Akşam antrenman ve lig hazırlıkları sürüyor."
 
 def telegram_gonder(mesaj):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -85,48 +35,69 @@ def telegram_gonder(mesaj):
     }
     requests.post(url, data=payload, timeout=10)
 
-def jarvis_sabah_raporu():
-    hava = hava_verisi_al()
+def ai_brifing_uret(hava_ozeti, tarih, gun_adi):
+    prompt = f"""
+Sen Tony Stark'ın yapay zeka asistanı JARVIS'sin. Karşındaki kişi senin Efendin.
+Görevin: Aşağıda sana iletilen teknik hava ve durum verilerini kullanarak Telegram için günlük şık, motive edici, hafif iğneleyici/esprili ve zeki bir sabah brifingi hazırlamak.
+
+GÜNCEL VERİLER:
+- Tarih: {tarih} ({gun_adi})
+- Konum: {KONUM}
+- Anlık Sıcaklık: {hava_ozeti.get('sicaklik')}°C (Hissedilen: {hava_ozeti.get('hissedilen')}°C)
+- Günün En Düşük / En Yüksek Sıcaklığı: {hava_ozeti.get('min_t')}°C / {hava_ozeti.get('max_t')}°C
+- Yağış İhtimali: %{hava_ozeti.get('yagis')}
+- Rüzgar Hızı: {hava_ozeti.get('ruzgar')} km/s
+
+KURALLAR:
+1. Hitap kesinlikle "Efendim" veya "Sayın Gökhan" olmalı.
+2. Klasik sıkıcı hava bülteni dili KULLANMA. İki tekerle (motosiklet/scooter) yola çıkış güvenliğine, rüzgar/zemin durumuna ve mont seçimine dair nokta atışı tavsiye ver.
+3. Hafta sonuysa Galatasaray ve lig gündemine veya stadyum trafiğine küçük bir atıf yapabilirsin.
+4. Telegram Markdown uyumlu olsun (kalın metinler için *metin*, temiz emoji ve çizgi kullanımı). Çok uzun roman gibi olmasın, mobil ekranda tek bakışta okunacak netlikte olsun.
+"""
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        print("Gemini API hatası:", e)
+        return None
+
+def calistir():
     tarih = datetime.datetime.now().strftime("%d.%m.%Y")
+    gun_adi = datetime.datetime.now().strftime("%A")
+    hava = hava_verisi_al()
 
+    hava_ozeti = {}
     if hava:
-        anlik = hava["current"]
-        gunluk = hava["daily"]
-        hava_durumu_str = HAVA_DURUMLARI.get(anlik["weather_code"], "Parçalı Bulutlu ⛅")
-        sicaklik = anlik["temperature_2m"]
-        hissedilen = anlik["apparent_temperature"]
-        min_t = gunluk["temperature_2m_min"][0]
-        max_t = gunluk["temperature_2m_max"][0]
-        yagis_ihtimal = gunluk["precipitation_probability_max"][0]
-    else:
-        hava_durumu_str = "Bilinmiyor"
-        sicaklik, hissedilen, min_t, max_t, yagis_ihtimal = "--", "--", "--", "--", "--"
+        hava_ozeti = {
+            "sicaklik": hava["current"]["temperature_2m"],
+            "hissedilen": hava["current"]["apparent_temperature"],
+            "ruzgar": hava["current"]["wind_speed_10m"],
+            "min_t": hava["daily"]["temperature_2m_min"][0],
+            "max_t": hava["daily"]["temperature_2m_max"][0],
+            "yagis": hava["daily"]["precipitation_probability_max"][0]
+        }
 
-    surus_notu = surus_ve_trafik_analizi(hava)
-    futbol_notu = mac_durumu_getir()
+    # Gemini'den dinamik metin al
+    mesaj = None
+    if GEMINI_API_KEY:
+        mesaj = ai_brifing_uret(hava_ozeti, tarih, gun_adi)
 
-    rapor = (
-        f"🎙️ *GÜNAYDIN EFENDİM, SİSTEMLER DEVREDE*\n"
-        f"📅 *{tarih} - Günlük Durum Brifingi*\n\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🌤️ *HAVA DURUMU ({KONUM.upper()})*\n"
-        f"• *Durum:* {hava_durumu_str}\n"
-        f"• *Sıcaklık:* {sicaklik}°C (Hissedilen: {hissedilen}°C)\n"
-        f"• *Günün Aralığı:* {min_t}°C / {max_t}°C\n"
-        f"• *Yağış İhtimali:* %{yagis_ihtimal}\n\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🛵 *YOL & SÜRÜŞ GÜVENLİĞİ*\n"
-        f"{surus_notu}\n"
-        f"• *Güzergah:* Cendere ve TEM bağlantıları sabah erken saatlerde akıcı.\n\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🏆 *FUTBOL & GÜNDEM*\n"
-        f"{futbol_notu}\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🚀 *Gününüz açık ve verimli geçsin.*"
-    )
+    # API hatası olursa yedek şablon devreye girer
+    if not mesaj:
+        mesaj = (
+            f"🎙️ *GÜNAYDIN EFENDİM*\n\n"
+            f"📅 Tarih: {tarih}\n"
+            f"🌤️ Sıcaklık: {hava_ozeti.get('sicaklik', '--')}°C | Yağış: %{hava_ozeti.get('yagis', '--')}\n"
+            f"💨 Rüzgar: {hava_ozeti.get('ruzgar', '--')} km/s\n\n"
+            f"Sistemler devrede, verimli bir gün dilerim."
+        )
 
-    telegram_gonder(rapor)
-    print("Jarvis brifingi Telegram'a iletildi.")
+    telegram_gonder(mesaj)
+    print("Brifing gönderildi.")
 
 if __name__ == "__main__":
-    jarvis_sabah_raporu()
+    calistir()
