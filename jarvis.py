@@ -4,7 +4,7 @@ import datetime
 
 # ================= AYARLAR =================
 # GitHub Secrets'tan alır; yerelde test için tırnak içine yazabilirsiniz
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8843267094:AAH1iW-PZjrz1ggrOk3fR3I18GU8ffNx8FQ")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8295147260:AAHvLFKd8aYg783qQiM2raUpk5Kmhns9OH0")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "921421260")
 
 # Kağıthane Koordinatları
