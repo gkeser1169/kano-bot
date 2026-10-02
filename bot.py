@@ -20,19 +20,38 @@ def telegram_bildir(mesaj):
     except Exception as e:
         print("Telegram hatası:", e)
 
-# Cloud Linux için optimize edilmiş Chrome ayarları
+def ekran_goruntusu_gonder():
+    try:
+        driver.save_screenshot("ekran.png")
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        with open("ekran.png", "rb") as foto:
+            requests.post(
+                url,
+                data={"chat_id": TELEGRAM_CHAT_ID, "caption": "📸 Botun gördüğü anlık sayfa görüntüsü"},
+                files={"photo": foto},
+                timeout=15
+            )
+        print("Ekran görüntüsü Telegram'a yollandı.")
+    except Exception as e:
+        print("Ekran görüntüsü gönderme hatası:", e)
+
 options = webdriver.ChromeOptions()
 options.add_argument("--headless=new")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-gpu")
 options.add_argument("--window-size=1920,1080")
+options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 try:
     print("Siteye bağlanılıyor...")
     driver.get(URL)
+    
+    # Sayfa açılır açılmaz 5 saniye bekle ve Telegram'a ekran görüntüsü at
+    time.sleep(5)
+    ekran_goruntusu_gonder()
 
     # Tablonun yüklenmesini bekle
     WebDriverWait(driver, 20).until(
@@ -67,6 +86,8 @@ try:
 
 except Exception as e:
     print("Hata oluştu:", e)
+    # Hata alırsa da ne olduğunu görmek için ekran görüntüsü yolla
+    ekran_goruntusu_gonder()
 
 finally:
     driver.quit()
